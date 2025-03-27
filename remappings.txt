@@ -1,0 +1,4 @@
+@lxly/=lib/lxly-bridge-and-call/src/
+@zkevm/=lib/lxly-bridge-and-call/lib/zkevm-contracts/contracts/
+@openzeppelin/contracts-upgradeable/=lib/lxly-bridge-and-call/lib/openzeppelin-contracts-upgradeable/contracts/
+@openzeppelin/contracts/=lib/lxly-bridge-and-call/lib/openzeppelin-contracts/contracts/
