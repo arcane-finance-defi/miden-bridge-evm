@@ -4,6 +4,8 @@ pragma solidity ^0.8.20;
 import "@zkevm/v2/PolygonZkEVMBridgeV2.sol";
 import {IBridgeAndCall} from "@lxly/IBridgeAndCall.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
+import "./MidenBridgeTokenWrapper.sol";
 
 
 error MalformedRecipientData();
@@ -17,17 +19,22 @@ error OriginMustBeBridgeExtension();
 error SenderMustBeBridge();
 error UnclaimedAsset();
 
-contract MidenBridgeExtension is IBridgeAndCall {
+contract MidenBridgeExtension is IBridgeAndCall, Ownable {
     using SafeERC20 for IERC20;
 
     uint32 constant public MIDEN_NETWORK_ID = 9966;
 
     PolygonZkEVMBridgeV2 public immutable bridge;
     address public immutable midenBridgeAddress;
+
+    mapping(bytes32 => address) public wrappers;
+
+    address public immutable managerAddress;
     
-    constructor(address bridge_, bytes15 midenBridge_) {
+    constructor(address bridge_, bytes15 midenBridge_, address managerAddress_) {
         bridge = PolygonZkEVMBridgeV2(bridge_);
         midenBridgeAddress = address(bytes20(midenBridge_));
+        managerAddress = managerAddress_;
     }
     
     function bridgeAndCall(
@@ -164,5 +171,27 @@ contract MidenBridgeExtension is IBridgeAndCall {
         bridge.bridgeAsset(destinationNetwork, midenBridgeAddress, amount, token, false, "");
     }
 
+    function issueToken(
+        address receiver, 
+        uint256 amount,
+        uint32 originNetwork,
+        address originAddress,
+        string memory tokenName,
+        string memory tokenSymbol,
+        uint8 tokenDecimals
+    ) external onlyOwner {
+        if (block.chainid == originNetwork) {
+            IERC20(originAddress).safeTransfer(receiver, amount);
+        }
+
+        bytes32 originDigest = keccak256(abi.encodePacked(originNetwork, originAddress));
+        if (wrappers[originDigest] == address(0)) {
+            MidenBridgeTokenWrapper wrapper = new MidenBridgeTokenWrapper(tokenName, tokenSymbol, tokenDecimals, originNetwork, originAddress, managerAddress);
+            wrappers[originDigest] = address(wrapper);
+        }
+
+        MidenBridgeTokenWrapper tokenContract = MidenBridgeTokenWrapper(wrappers[originDigest]);
+        tokenContract.mint(receiver, amount);
+    }
     
 }
