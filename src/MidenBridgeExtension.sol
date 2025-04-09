@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.20;
 
-import "@zkevm/v2/PolygonZkEVMBridgeV2.sol";
+import "./PolygonZkEVMBridgeMock.sol";
 import {IBridgeAndCall} from "@lxly/IBridgeAndCall.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
@@ -24,7 +24,7 @@ contract MidenBridgeExtension is IBridgeAndCall, Ownable {
 
     uint32 constant public MIDEN_NETWORK_ID = 9966;
 
-    PolygonZkEVMBridgeV2 public immutable bridge;
+    PolygonZkEVMBridgeMock public immutable bridge;
     address public immutable midenBridgeAddress;
 
     mapping(bytes32 => address) public wrappers;
@@ -32,7 +32,7 @@ contract MidenBridgeExtension is IBridgeAndCall, Ownable {
     address public immutable managerAddress;
     
     constructor(address bridge_, bytes15 midenBridge_, address managerAddress_) {
-        bridge = PolygonZkEVMBridgeV2(bridge_);
+        bridge = PolygonZkEVMBridgeMock(bridge_);
         midenBridgeAddress = address(bytes20(midenBridge_));
         managerAddress = managerAddress_;
     }
@@ -44,7 +44,7 @@ contract MidenBridgeExtension is IBridgeAndCall, Ownable {
         address callAddress,
         address fallbackAddress,
         bytes calldata callData,
-        bool forceUpdateGlobalExitRoot
+        bool _forceUpdateGlobalExitRoot
     ) external payable {
         _ensureRecipientDataValidity(callData);
         if (callAddress != address(0)) revert CallAddressShouldBeZero();
@@ -122,7 +122,7 @@ contract MidenBridgeExtension is IBridgeAndCall, Ownable {
             );
         }
 
-        bridge.bridgeMessage(destinationNetwork, midenBridgeAddress, forceUpdateGlobalExitRoot, encodedMsg);
+        bridge.bridgeMessage(destinationNetwork, midenBridgeAddress, encodedMsg);
 
     }
 
@@ -136,7 +136,7 @@ contract MidenBridgeExtension is IBridgeAndCall, Ownable {
         uint32 destinationNetwork
     ) internal {
         // bridge the ERC20 assets - no need to approve, bridge will burn the tokens
-        bridge.bridgeAsset(destinationNetwork, midenBridgeAddress, amount, token, false, "");
+        bridge.bridgeAsset(destinationNetwork, midenBridgeAddress, amount, token, "");
     }
 
     function _bridgeNativeAssetHelper(
@@ -145,7 +145,7 @@ contract MidenBridgeExtension is IBridgeAndCall, Ownable {
     ) internal {
 
         // bridge the native assets
-        bridge.bridgeAsset{value: amount}(destinationNetwork, midenBridgeAddress, amount, address(0), false, "");
+        bridge.bridgeAsset{value: amount}(destinationNetwork, midenBridgeAddress, amount, address(0), "");
     }
 
     function _bridgeERC20AssetHelper(
@@ -168,30 +168,26 @@ contract MidenBridgeExtension is IBridgeAndCall, Ownable {
         }
 
         // bridge the ERC20 assets
-        bridge.bridgeAsset(destinationNetwork, midenBridgeAddress, amount, token, false, "");
+        bridge.bridgeAsset(destinationNetwork, midenBridgeAddress, amount, token, "");
     }
 
     function issueToken(
         address receiver, 
         uint256 amount,
-        uint32 originNetwork,
-        address originAddress,
+        uint32 originTokenNetwork,
+        address originTokenAddress,
         string memory tokenName,
         string memory tokenSymbol,
         uint8 tokenDecimals
     ) external onlyOwner {
-        if (block.chainid == originNetwork) {
-            IERC20(originAddress).safeTransfer(receiver, amount);
-        }
-
-        bytes32 originDigest = keccak256(abi.encodePacked(originNetwork, originAddress));
-        if (wrappers[originDigest] == address(0)) {
-            MidenBridgeTokenWrapper wrapper = new MidenBridgeTokenWrapper(tokenName, tokenSymbol, tokenDecimals, originNetwork, originAddress, managerAddress);
-            wrappers[originDigest] = address(wrapper);
-        }
-
-        MidenBridgeTokenWrapper tokenContract = MidenBridgeTokenWrapper(wrappers[originDigest]);
-        tokenContract.mint(receiver, amount);
+        bridge.claimAsset(
+            originTokenNetwork,
+            originTokenAddress,
+            bridge.networkID(),
+            receiver,
+            amount,
+            abi.encode(tokenName, tokenSymbol, tokenDecimals)
+        );
     }
     
 }
