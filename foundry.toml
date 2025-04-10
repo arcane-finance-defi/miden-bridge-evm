@@ -5,7 +5,9 @@ libs = ["lib"]
 
 [rpc_endpoints]
 tenderly = "${TENDERLY_VIRTUAL_TESTNET_RPC_URL}"
+amoy = "${AMOY_RPC_URL}"
 
 # See more config options https://github.com/foundry-rs/foundry/blob/master/crates/config/README.md#all-options
 [etherscan]
 tenderly = { key = "${TENDERLY_ACCESS_KEY}", chain = 12345, url = "${TENDERLY_VIRTUAL_TESTNET_RPC_URL}/verify/etherscan" }
+amoy = { key = "${AMOY_POLYGONSCAN_TOKEN}", chain = 80002, url = "https://api-amoy.polygonscan.com/api" }
